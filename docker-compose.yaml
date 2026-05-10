@@ -1,4 +1,31 @@
-version: '3.8'
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor 
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
+    AIRFLOW__WEBSERVER__WEB_SERVER_PORT: '8081'
+    _PIP_ADDITIONAL_REQUIREMENTS: ''
+    AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/dags/sql:/opt/airflow/dags/sql
+    - ./airflow/requirements.txt:/opt/airflow/requirements.txt
+    - ./airflow/data:/opt/airflow/sample_files
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+  networks:
+    - dag_sample
 
 services:
   keycloak_db:
@@ -11,6 +38,9 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - dag_sample
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -29,6 +59,9 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+    networks:
+      - dag_sample
+
   frontend:
     build:
       context: ./frontend
@@ -40,3 +73,179 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    networks:
+      - dag_sample
+
+  backend:
+    build:
+      context: ./backend/BionicPro
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000" 
+    depends_on:
+      - keycloak
+    environment:
+      ASPNETCORE_URLS: "http://+:8000"
+      Keycloak__Authority: http://keycloak:8080
+      Keycloak__Realm: reports-realm
+      Keycloak__Audience: reports-api
+      Keycloak__ClientId: reports-api
+      Keycloak__ClientSecret: oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq
+      ClickHouse__Host: olap_db
+      ClickHouse__Port: 8123
+      ClickHouse__Database: bionicpro_analytics
+      ClickHouse__User: default
+      ClickHouse__Password:
+    networks:
+      - dag_sample
+
+  olap_db:
+    image: clickhouse/clickhouse-server:23.8
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./olap-db:/docker-entrypoint-initdb.d
+    ports:
+      - "8123:8123"  # HTTP
+      - "9000:9000"  # HTTP
+    networks:
+      - dag_sample
+
+  crm_db:
+    image: postgres:16
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -U
+        - bionicpro_crm
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    environment:
+      POSTGRES_DB: bionicpro_crm
+      POSTGRES_USER: bionicpro_crm
+      POSTGRES_PASSWORD: bionicpro_crm
+    volumes:
+      - postgres_crm_data:/var/lib/postgresql/data
+      - ./crm-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5435:5432"
+    networks:
+      - dag_sample
+  
+  postgres:
+    image: postgres:16.0
+    volumes:
+      - ./airflow/db/init-db.sql:/docker-entrypoint-initdb.d/db.sql
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -U
+        - airflow
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - dag_sample
+                 
+  airflow-webserver:
+    <<: *airflow-common
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    networks:
+      - dag_sample
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8081/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  airflow-scheduler:
+    <<: *airflow-common
+    networks:
+      - dag_sample
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8081/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  airflow-triggerer:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      - dag_sample
+    command: bash -c "airflow triggerer"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - airflow jobs check --job-type TriggererJob --hostname "${HOSTNAME}"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  airflow-cli:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dag_sample
+    profiles:
+      - debug
+    command:
+      - bash
+      - -c
+      - airflow
+
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      bash -c "
+        airflow db init && 
+        airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@sample.ru --password admin &&
+        airflow connections add 'bionicpro_crm' --conn-type 'postgres' --conn-host 'crm_db' --conn-login 'bionicpro_crm' --conn-password 'bionicpro_crm' --conn-port '5432' --conn-schema 'bionicpro_crm' &&
+        airflow connections add 'bionicpro_clickhouse' --conn-type 'clickHouse' --conn-host 'olap_db' --conn-login 'default' --conn-password '' --conn-port '8123' --conn-schema 'default'
+      "
+    networks:
+      - dag_sample
+
+networks:
+  dag_sample:
+
+volumes:
+  postgres_crm_data:
+  postgres_telemetry_data:
+  clickhouse_data:
