@@ -13,9 +13,19 @@
         public string UserName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Модель протеза
+        /// Почта
         /// </summary>
-        public string ProsthesisModel { get; set; } = string.Empty;
+        public string UserEmail { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Тип протеза
+        /// </summary>
+        public string ProsthesisType { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Всего сигналов
+        /// </summary>
+        public long TotalSignals { get; set; }
 
         /// <summary>
         /// Дата отчета
@@ -23,43 +33,19 @@
         public DateTime ReportDate { get; set; }
 
         /// <summary>
-        /// Средняя сила сигнала
+        /// "Средняя частота сигнала (Гц)
         /// </summary>
-        public double AvgSignalStrength { get; set; }
+        public double AvgSignalFrequency { get; set; }
 
         /// <summary>
-        /// Средний уровень заряда
+        /// Средняя длительность (мс)
         /// </summary>
-        public int AvgBatteryLevel { get; set; }
+        public double AvgSignalDuration { get; set; }
 
         /// <summary>
-        /// Среднее время реакции
+        /// Средняя амплитуда (мкВ)
         /// </summary>
-        public int AvgResponseTimeMs { get; set; }
-
-        /// <summary>
-        /// Всего движений
-        /// </summary>
-        public int TotalMovements { get; set; }
-
-        /// <summary>
-        /// Чаще всего используемое движение
-        /// </summary>
-        public string MostUsedMovement { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Ошибок за период
-        /// </summary>
-        public int TotalErrors { get; set; }
-
-        /// <summary>
-        /// Время активности
-        /// </summary>
-        public double UptimeHours { get; set; }
-
-        /// <summary>
-        /// Оценка производительности
-        /// </summary>
-        public string PerformanceGrade { get; set; } = string.Empty;
+        public double AvgSignalAmplitude { get; set; }
+       
     }
 }

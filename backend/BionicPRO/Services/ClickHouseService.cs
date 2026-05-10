@@ -37,9 +37,6 @@ namespace BionicPRO.Services
                 var startDateOnly = startDate.ToString("yyyy-MM-dd");
                 var endDateOnly   = endDate.ToString("yyyy-MM-dd");
                 
-                var safeUserId = userId.Replace("'", "''");// Экранируем userId для безопасной вставки
-                //var safeUserId    = userId.Replace("'", "''"); // Экранирование кавычек
-
 
 
                 await using var connection    = new ClickHouseConnection(_connectionString);
@@ -49,22 +46,22 @@ namespace BionicPRO.Services
                 SELECT 
                     user_id,
                     user_name,
-                    prosthesis_model,
-                    report_date,
-                    avg_signal_strength,
-                    avg_battery_level,
-                    avg_response_time_ms,
-                    total_movements,
-                    most_used_movement,
-                    total_errors,
-                    uptime_hours,
-                    performance_grade
-                FROM reporting_daily
-                WHERE user_id = {userId:String}
-                        AND report_date BETWEEN {startDate:Date} AND {endDate:Date}
-                ORDER BY report_date DESC";
+                    user_email,
+                    prosthesis_type,
+                    total_signals,
+                    avg_signal_frequency,
+                    avg_signal_duration,
+                    avg_signal_amplitude,
+                    report_period_start,
+                    report_period_end,
+                    last_signal_time,
+                    report_generated_at    
+                    
+                FROM bionicpro_analytics.reporting
+                WHERE user_name = {userId:String}
+                ORDER BY report_period_start DESC";
 
-                // 
+                // AND report_period_start BETWEEN {startDate:Date} AND {endDate:Date}
                 // 
                 await using var command = connection.CreateCommand();
                 command.CommandText = query;
@@ -73,16 +70,16 @@ namespace BionicPRO.Services
                     ParameterName = "userId",
                     Value = userId,
                 });
-                command.Parameters.Add(new ClickHouseDbParameter()
-                {
-                    ParameterName = "startDate",
-                    Value = startDateOnly,
-                });
-                command.Parameters.Add(new ClickHouseDbParameter()
-                {
-                    ParameterName = "endDate",
-                    Value = endDateOnly,
-                });
+                //command.Parameters.Add(new ClickHouseDbParameter()
+                //{
+                //    ParameterName = "startDate",
+                //    Value = startDateOnly,
+                //});
+                //command.Parameters.Add(new ClickHouseDbParameter()
+                //{
+                //    ParameterName = "endDate",
+                //    Value = endDateOnly,
+                //});
 
                 await using var reader = await command.ExecuteReaderAsync();
 
@@ -90,11 +87,15 @@ namespace BionicPRO.Services
                 {
                     reports.Add(new ReportModel
                     {
-                        UserId            = reader.GetString(0),
-                        UserName          = reader.GetString(1),
-                        ProsthesisModel   = reader.GetString(2),
-                        ReportDate        = reader.GetDateTime(3),
-                        AvgSignalStrength = reader.GetFloat(4),
+                        UserId             = reader.GetString(0),
+                        UserName           = reader.GetString(1),
+                        UserEmail          = reader.GetString(2),
+                        ProsthesisType     = reader.GetString(3),
+                        //TotalSignals       = reader.GetFieldValue<long>(4),
+                        AvgSignalFrequency = reader.GetDouble(5),
+                        AvgSignalDuration  = reader.GetDouble(6),
+                        AvgSignalAmplitude = reader.GetDouble(7),
+                        ReportDate         = reader.GetDateTime(8)
                         //AvgBatteryLevel   = reader.GetByte(5),
                         //AvgResponseTimeMs = reader.GetFieldValue<ushort>(6),
                         //TotalMovements    = reader.GetFieldValue<ushort>(7),

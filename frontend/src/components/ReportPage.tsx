@@ -3,16 +3,14 @@ import { useKeycloak } from '@react-keycloak/web';
 
  // Интерфейсы для данных отчета
 interface Report {
+  userName: string; 
+  userEmail: string; 
   reportDate: string;
   avgSignalStrength: number;
-  prosthesisModel: string;
-  avgBatteryLevel: number;
-  avgResponseTimeMs: number;
-  totalMovements: number;
-  mostUsedMovement: string;
-  totalErrors: number;
-  uptimeHours: number;
-  performanceGrade: string;
+  prosthesisType: string;
+  avgSignalFrequency: number;
+  avgSignalDuration: number;
+  avgSignalAmplitude: number;
 }
 
 interface ReportResponse {
@@ -169,18 +167,24 @@ const ReportPage: React.FC = () => {
           <thead>
             <tr style={{ background: '#1061B0', color: 'white' }}>
               <th style={{ padding: '10px', border: '1px solid #ddd' }}>Время</th>
-              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Модель протеза</th>
-              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Сигнал</th>
-              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Ошибок</th>
+              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Имя пользователя</th>
+              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Почта</th>
+              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Тип протеза</th>
+              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Средняя частота сигнала (Гц)</th>
+              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Средняя длительность (мс)</th>
+              <th style={{ padding: '10px', border: '1px solid #ddd' }}>Средняя амплитуда (мкВ)</th>
             </tr>
           </thead>
           <tbody>
             {reports.map((report, idx) => (
               <tr key={idx} style={{ borderBottom: '1px solid #ddd' }}>
                 <td style={{ padding: '10px', textAlign: 'center' }}>{report.reportDate}</td>
-                <td style={{ padding: '10px', textAlign: 'center' }}>{report.prosthesisModel}</td>
-                <td style={{ padding: '10px', textAlign: 'center' }}>{report.avgSignalStrength} ms</td>
-                <td style={{ padding: '10px', textAlign: 'center' }}>{report.totalErrors}</td>
+                <td style={{ padding: '10px', textAlign: 'center' }}>{report.userName}</td>
+                <td style={{ padding: '10px', textAlign: 'center' }}>{report.userEmail}</td>
+                <td style={{ padding: '10px', textAlign: 'center' }}>{report.prosthesisType}</td>
+                <td style={{ padding: '10px', textAlign: 'center' }}>{report.avgSignalFrequency} ms</td>
+                <td style={{ padding: '10px', textAlign: 'center' }}>{report.avgSignalDuration}</td>
+                <td style={{ padding: '10px', textAlign: 'center' }}>{report.avgSignalAmplitude}</td>
               </tr>
             ))}
           </tbody>

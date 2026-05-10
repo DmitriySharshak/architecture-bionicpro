@@ -33,7 +33,7 @@ namespace BionicPRO.Data
         public long Id { get; set; }
 
         [Column("report_date")]
-        public DateTime ReportDate { get; set; }
+        public DateTime ReporStarttDate { get; set; }
 
         [Column("user_id")]
         public string UserId { get; set; } = string.Empty;
