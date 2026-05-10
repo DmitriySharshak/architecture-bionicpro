@@ -156,3 +156,5 @@ tests/postman/reports/
 
 .vs
 obj
+
+postgres-keycloak-data
